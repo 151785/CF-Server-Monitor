@@ -59,12 +59,12 @@ export async function checkOfflineNodes(db, sys) {
 
     for (const s of allServers) {
       const diff = now - s.last_updated;
-      const isOffline = diff > 120000;
+      const isOffline = diff > 300000;
 
       if (isOffline && !alertState[s.id]) {
         const msg = `⚠️ **节点离线告警**\n\n` +
           `**节点名称:** ${s.name}\n` +
-          `**状态:** 离线 (超过2分钟未上报)\n` +
+          `**状态:** 离线 (超过5分钟未上报)\n` +
           `**时间:** ${new Date().toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})}`;
         
         await sendTelegramNotification(sys, msg);

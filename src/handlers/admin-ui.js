@@ -1001,7 +1001,7 @@ export async function handleAdminUI(request, env, sys) {
                 <label class="form-label">Offline Alert</label>
                 <select id="cfg_tg_notify" class="form-select">
                   <option value="false" ${sys.tg_notify !== 'true' ? 'selected' : ''}>[OFF] Disabled</option>
-                  <option value="true" ${sys.tg_notify === 'true' ? 'selected' : ''}>[ON] Notify after 2min offline</option>
+                  <option value="true" ${sys.tg_notify === 'true' ? 'selected' : ''}>[ON] Notify after 5min offline</option>
                 </select>
               </div>
               

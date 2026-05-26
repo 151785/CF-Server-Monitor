@@ -6,7 +6,7 @@ export async function handleServerDetail(request, env, sys, viewId) {
   if (!server) return new Response('Server not found', { status: 404 });
 
   const now = Date.now();
-  const isOnline = (now - server.last_updated) < 30000;
+  const isOnline = (now - server.last_updated) < 120000;
   
   const cCode = (server.country || 'xx').toLowerCase();
   const flagHtml = cCode !== 'xx' 
@@ -1140,7 +1140,7 @@ export async function handleServerDetail(request, env, sys, viewId) {
         const data = await res.json();
         
         // 更新状态徽章
-        const isOnline = (Date.now() - data.last_updated) < 30000;
+        const isOnline = (Date.now() - data.last_updated) < 120000;
         const badge = document.getElementById('head-status');
         badge.innerHTML = \`<span class="pulse-dot \${isOnline ? 'online' : 'offline'}"></span>\${isOnline ? 'CONNECTED' : 'DISCONNECTED'}\`;
         badge.className = 'status-badge ' + (isOnline ? 'online' : 'offline');

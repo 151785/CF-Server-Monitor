@@ -41,7 +41,7 @@ export async function handleDashboard(request, env, sys) {
 
   if (results && results.length > 0) {
     for (const server of results) {
-      const isOnline = (now - server.last_updated) < 30000;
+      const isOnline = (now - server.last_updated) < 120000;
       
       if (isOnline) {
         globalOnline++;
@@ -99,7 +99,7 @@ export async function handleDashboard(request, env, sys) {
         <div class="servers-grid">`;
       
       for (const server of grpServers) {
-        const isOnline = (now - server.last_updated) < 30000;
+        const isOnline = (now - server.last_updated) < 120000;
         const statusColor = isOnline ? 'var(--accent-green)' : 'var(--accent-red)';
         const statusText = isOnline ? 'ONLINE' : 'OFFLINE';
         
