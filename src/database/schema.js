@@ -1,4 +1,5 @@
 let dbInitialized = false;
+const DELETE_RAW_DATA = false; // 是否删除原始数据
 
 export async function initDatabase(db) {
   if (dbInitialized) return;
@@ -161,9 +162,6 @@ export async function initDatabase(db) {
     console.error('❌ 数据库初始化失败:', e);
   }
 }
-
-// 是否删除原始数据
-const DELETE_RAW_DATA = false;
 
 const AGGREGATE_PHASES = [
   {
@@ -751,5 +749,45 @@ export async function saveMetricsHistory(db, serverId, metrics) {
     ).run();
   } catch (e) {
     console.error('保存历史数据失败:', e);
+  }
+}
+
+export async function getLatestMetrics(db, serverId) {
+  try {
+    const result = await db.prepare(`
+      SELECT * FROM metrics_history 
+      WHERE server_id = ? 
+      ORDER BY timestamp DESC 
+      LIMIT 1
+    `).bind(serverId).first();
+    
+    return result || null;
+  } catch (e) {
+    console.error('获取最新指标数据失败:', e);
+    return null;
+  }
+}
+
+export async function getLatestMetricsForAllServers(db) {
+  try {
+    const { results } = await db.prepare(`
+      SELECT mh.*
+      FROM metrics_history mh
+      INNER JOIN (
+        SELECT server_id, MAX(timestamp) as max_ts
+        FROM metrics_history
+        GROUP BY server_id
+      ) latest ON mh.server_id = latest.server_id AND mh.timestamp = latest.max_ts
+    `).all();
+    
+    const map = new Map();
+    for (const row of results) {
+      map.set(row.server_id, row);
+    }
+    
+    return map;
+  } catch (e) {
+    console.error('获取所有服务器最新指标数据失败:', e);
+    return new Map();
   }
 }

@@ -102,6 +102,30 @@ export async function sendWeworkNotification(settings, msg) {
   }
 }
 
+async function getLatestMetricsForAllServers(db) {
+  try {
+    const { results } = await db.prepare(`
+      SELECT mh.*
+      FROM metrics_history mh
+      INNER JOIN (
+        SELECT server_id, MAX(timestamp) as max_ts
+        FROM metrics_history
+        GROUP BY server_id
+      ) latest ON mh.server_id = latest.server_id AND mh.timestamp = latest.max_ts
+    `).all();
+    
+    const map = new Map();
+    for (const row of results) {
+      map.set(row.server_id, row);
+    }
+    
+    return map;
+  } catch (e) {
+    console.error('获取所有服务器最新指标数据失败:', e);
+    return new Map();
+  }
+}
+
 export async function checkOfflineNodes(db) {
   const notifySettings = await loadNotificationSettings(db);
   if (notifySettings.tg_notify !== 'true') return;
@@ -110,6 +134,8 @@ export async function checkOfflineNodes(db) {
     const { results: allServers } = await db.prepare(
       'SELECT id, name, last_updated FROM servers'
     ).all();
+    
+    const latestMetricsMap = await getLatestMetricsForAllServers(db);
     
     let alertState = {};
     const stateRes = await db.prepare(
@@ -128,7 +154,15 @@ export async function checkOfflineNodes(db) {
     const now = Date.now();
 
     for (const s of allServers) {
-      const lastUpdated = new Date(s.last_updated).getTime();
+      const latestMetrics = latestMetricsMap.get(s.id);
+      
+      let lastUpdated;
+      if (latestMetrics) {
+        lastUpdated = latestMetrics.timestamp;
+      } else {
+        lastUpdated = new Date(s.last_updated).getTime();
+      }
+      
       const diff = now - lastUpdated;
       const isOffline = diff > 300000;
 

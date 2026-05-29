@@ -1,6 +1,7 @@
 import { formatBytes, getPingColor } from '../utils/format.js';
 import { getThemeStyles, getFooterHtml } from '../themes/styles.js';
 import { checkAuth, authResponse } from '../middleware/auth.js';
+import { getLatestMetrics } from '../database/schema.js';
 
 export async function handleServerDetail(request, env, sys, viewId) {
   if (sys.is_public !== 'true' && !checkAuth(request, env)) {
@@ -17,8 +18,37 @@ export async function handleServerDetail(request, env, sys, viewId) {
   const server = await env.DB.prepare(query).bind(viewId).first();
   if (!server) return new Response('Server not found', { status: 404 });
 
+  const latestMetrics = await getLatestMetrics(env.DB, viewId);
+  
   const now = Date.now();
-  const serverLastUpdated = new Date(server.last_updated).getTime();
+  let serverLastUpdated = new Date(server.last_updated).getTime();
+  
+  if (latestMetrics) {
+    serverLastUpdated = latestMetrics.timestamp;
+    
+    server.cpu = latestMetrics.cpu || 0;
+    server.ram = latestMetrics.ram || 0;
+    server.disk = latestMetrics.disk || 0;
+    server.load_avg = latestMetrics.load_avg || '0';
+    server.net_in_speed = latestMetrics.net_in_speed || 0;
+    server.net_out_speed = latestMetrics.net_out_speed || 0;
+    server.net_rx = latestMetrics.net_rx || 0;
+    server.net_tx = latestMetrics.net_tx || 0;
+    server.processes = latestMetrics.processes || 0;
+    server.tcp_conn = latestMetrics.tcp_conn || 0;
+    server.udp_conn = latestMetrics.udp_conn || 0;
+    server.ping_ct = latestMetrics.ping_ct || 0;
+    server.ping_cu = latestMetrics.ping_cu || 0;
+    server.ping_cm = latestMetrics.ping_cm || 0;
+    server.ping_bd = latestMetrics.ping_bd || 0;
+    server.ram_total = latestMetrics.ram_total || 0;
+    server.ram_used = latestMetrics.ram_used || 0;
+    server.swap_total = latestMetrics.swap_total || 0;
+    server.swap_used = latestMetrics.swap_used || 0;
+    server.disk_total = latestMetrics.disk_total || 0;
+    server.disk_used = latestMetrics.disk_used || 0;
+  }
+  
   const isOnline = (now - serverLastUpdated) < 120000;
   
   const cCode = (server.country || 'xx').toLowerCase();
