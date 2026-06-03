@@ -250,13 +250,13 @@ const getStatusColor = (server) => {
 const getUpdateTime = (lastUpdated) => {
   if (!lastUpdated) return '-'
   const diffMs = Date.now() - new Date(lastUpdated).getTime()
-  if (diffMs < 0) return '0day, 00:00:00 ago'
+  if (diffMs < 0) return '00:00:00 ago'
   const totalSeconds = Math.floor(diffMs / 1000)
   const days = Math.floor(totalSeconds / 86400)
-  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const hours = Math.floor((totalSeconds % 86400) / 3600) + days * 24
   const minutes = Math.floor((totalSeconds % 3600) / 60)
   const seconds = totalSeconds % 60
-  return `${days}day${days !== 1 ? 's' : ''}, ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')} ago`
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')} ago`
 }
 
 const refreshData = async () => {

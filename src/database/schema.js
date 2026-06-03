@@ -1,11 +1,13 @@
+import { 
+  getAllServers, 
+  getLatestMetricsCache, 
+  setLatestMetricsCache,
+  getMetricsHistoryCache,
+  setMetricsHistoryCache,
+  clearMetricsHistoryCache
+} from '../utils/cache.js';
+
 let dbInitialized = false;
-
-const metricsHistoryCache = new Map();
-
-function getCacheKey(serverId, hours, columns) {
-  const sortedColumns = columns.split(',').sort().join(',');
-  return `${serverId}:${hours}:${sortedColumns}`;
-}
 
 function getCacheDuration(hours) {
   if (hours >= 60) {
@@ -106,7 +108,6 @@ export async function rebuildDatabase(db) {
     console.log('✅ 已删除 settings 表');
     
     dbInitialized = false;
-    metricsHistoryCache.clear();
     
     await initDatabase(db);
     
@@ -134,10 +135,9 @@ export async function rebuildDatabase(db) {
 
 export async function getMetricsHistory(db, serverId, hours, columns) {
   const now = Date.now();
-  const cacheKey = getCacheKey(serverId, hours, columns);
   const cacheDuration = getCacheDuration(hours);
   
-  const cached = metricsHistoryCache.get(cacheKey);
+  const cached = getMetricsHistoryCache(serverId, hours, columns);
   if (cached && now - cached.timestamp < cacheDuration) {
     console.log(`[History] CACHE HIT: ${serverId}, hours: ${hours}`);
     return cached.data;
@@ -198,10 +198,7 @@ export async function getMetricsHistory(db, serverId, hours, columns) {
 
   result.sort((a, b) => a.timestamp - b.timestamp);
   
-  metricsHistoryCache.set(cacheKey, {
-    timestamp: now,
-    data: result
-  });
+  setMetricsHistoryCache(serverId, hours, columns, result);
 
   console.log(`[History] FINAL: ${result.length}`);
 
@@ -246,7 +243,6 @@ export async function saveMetricsHistory(db, serverId, metrics, countryCode = ''
   try {
     const now = Date.now();
     
-    // 安全解析 ping 值，空值或 0 表示不可达，存储为 NULL
     const parsePing = (val) => {
       if (val === '' || val === null || val === undefined) return null;
       const num = parseInt(val);
@@ -326,8 +322,14 @@ export async function getLatestMetrics(db, serverId) {
 }
 
 export async function getLatestMetricsForAllServers(db) {
+  const now = Date.now();
+  const cacheInfo = getLatestMetricsCache();
+  if (cacheInfo.cache && now - cacheInfo.time < cacheInfo.ttl) {
+    return cacheInfo.cache;
+  }
+
   try {
-    const { results: servers } = await db.prepare('SELECT id FROM servers').all();
+    const servers = await getAllServers(db);
 
     const entries = await Promise.all(
       servers.map(s =>
@@ -335,9 +337,14 @@ export async function getLatestMetricsForAllServers(db) {
       )
     );
 
-    return new Map(entries.filter(([, m]) => m !== null));
+    const result = new Map(entries.filter(([, m]) => m !== null));
+    setLatestMetricsCache(result);
+    return result;
   } catch (e) {
     console.error('获取所有服务器最新指标数据失败:', e);
-    return new Map();
+    const cacheInfo = getLatestMetricsCache();
+    return cacheInfo.cache || new Map();
   }
 }
+
+export { getAllServers };

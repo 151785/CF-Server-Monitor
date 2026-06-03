@@ -1,4 +1,4 @@
-import { getLatestMetricsForAllServers } from '../database/schema.js';
+import { getLatestMetricsForAllServers, getAllServers } from '../database/schema.js';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
@@ -109,9 +109,7 @@ export async function checkOfflineNodes(db) {
   if (notifySettings.tg_notify !== 'true') return;
   
   try {
-    const { results: allServers } = await db.prepare(
-      'SELECT id, name FROM servers'
-    ).all();
+    const allServers = await getAllServers(db);
     
     const latestMetricsMap = await getLatestMetricsForAllServers(db);
     

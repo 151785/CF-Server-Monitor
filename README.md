@@ -1,25 +1,12 @@
 # CF-Server-Monitor-Pro
 
-**版本：V2.2**
+**版本：V2.3**
 
-一个基于 Cloudflare Workers + D1 的多服务器监控探针系统，支持实时监控、历史数据查看、延迟追踪、地图展示等功能。基于 [CF-Server-Monitor-Pro](https://github.com/a63414262/CF-Server-Monitor-Pro) 深度二次开发
-
-## 🔄 V2.0 版本升级说明
-
-本次版本更新带来了以下重大改进：
-
-- **🎨 Vue 前后端分离**：采用 Vue 3 + Vite 重构前端架构，实现前后端完全分离，提升开发效率和代码可维护性
-- **🧪 本地测试模拟数据**：新增本地测试数据生成功能，无需部署即可在本地进行完整的功能测试和调试
-- **🌐 双语支持**：全面支持中文和英文界面，可在设置中自由切换，方便国际化使用
-- **⚡ 功能优化与修复**：全面优化性能，提升响应速度，修复多项已知问题，提供更稳定的使用体验
-
-## 🔄 数据库更新说明
-
-旧版本用户升级，需要访问后台管理页面，点击升级数据库按钮即可。
+一个基于 Cloudflare Workers + D1 的多服务器监控探针系统，支持实时监控、历史数据查看、延迟追踪、地图展示等功能。
 
 ## ✨ 功能特点
 
-- 📊 **实时监控**：CPU、内存、磁盘、网络、进程数、连接数
+- 📊 **实时监控**：CPU、内存、磁盘、网络、进程数、连接数、负载均衡
 - 📈 **历史图表**：支持 1/3/6/12/24 小时历史数据查看
 - 🌍 **全球地图**：可视化展示服务器分布
 - 🔔 **离线告警**：支持 Telegram 和企业微信通知
@@ -36,21 +23,19 @@
 ```
 CF-Server-Monitor/
 ├── public/
-│   ├── themes/
-│   │   └── light.css           # 白色主题样式
 │   ├── install.sh              # 一键安装脚本（含卸载）
-│   ├── logo.svg                # Logo
-│   └── style.css               # 全局样式
+│   └── logo.svg                # Logo
 ├── src/
 │   ├── index.js                # 后端主入口 - 路由分发
 │   ├── database/
-│   │   └── schema.js           # 数据库初始化、历史数据存储
+│   │   ├── schema.js           # 数据库初始化、历史数据存储
+│   │   └── updateDatabase.js   # 数据库升级处理
 │   ├── middleware/
 │   │   └── auth.js             # 认证中间件
 │   ├── handlers/
 │   │   ├── admin.js            # 后台管理 API
 │   │   ├── dashboard.js        # 前台大盘 API
-│   │   ├── frontend.js          # 前端资源服务
+│   │   ├── frontend.js         # 前端资源服务
 │   │   └── update.js           # 数据上报处理
 │   ├── services/
 │   │   └── notification.js     # 通知服务
@@ -61,7 +46,7 @@ CF-Server-Monitor/
 │       │   ├── ServerCard.vue
 │       │   ├── TerminalHeader.vue
 │       │   └── Footer.vue
-│       ├── views/             # 页面视图
+│       ├── views/              # 页面视图
 │       │   ├── Dashboard.vue
 │       │   ├── ServerDetail.vue
 │       │   └── Admin.vue
@@ -70,12 +55,17 @@ CF-Server-Monitor/
 │       ├── utils/
 │       │   ├── api.js          # API 请求封装
 │       │   └── i18n.js         # 国际化配置
+│       ├── styles/             # 样式文件
+│       │   ├── light.css
+│       │   └── main.css
 │       ├── App.vue             # 根组件
 │       └── main.js             # 前端入口
 ├── scripts/
 │   └── build.js                # 前端构建脚本
 ├── test/
+│   ├── README.md               # 测试工具说明
 │   └── generate-sql.js         # 测试数据生成工具
+├── index.html
 ├── package.json
 ├── vite.config.js              # Vite 配置
 ├── wrangler.toml
@@ -118,13 +108,12 @@ CF-Server-Monitor/
 
 - 登录后访问任意 Cloudflare 页面，例如 `https://dash.cloudflare.com/f81d307ba09470a84732724694435c9c4c4c/workers-and-pages`
 - URL 中 `dash.cloudflare.com/` 之后的那串字符就是 Account ID
-- 以上例子中，`f81d307ba09470a84732724694435c9c4c4c` 就是 Account ID
 
 #### 获取 API Token
 
 1. 打开 [API Tokens 页面](https://dash.cloudflare.com/profile/api-tokens)
 2. 点击 **Create Token/创建令牌**
-3. 选择（ **Edit Cloudflare Workers/编辑 Cloudflare Workers** ）模板
+3. 选择（**Edit Cloudflare Workers/编辑 Cloudflare Workers**）模板
 4. 在 **Account Resources/帐户资源** 选择你的账户
 5. 点击 **Continue to summary/继续以显示摘要**→ **Create Token/创建令牌**
 6. 复制生成的 Token（只显示一次！）
@@ -133,7 +122,7 @@ CF-Server-Monitor/
 
 1. 打开你 Fork 的 GitHub 仓库
 2. 进入 **Settings** → **Secrets and variables** → **Actions**
-3. 点击 **New repository secret**，依次添加以下 4 个密钥：
+3. 点击 **New repository secret**，依次添加以下 5 个密钥：
 
 | Secret 名称        | 值                         | 说明                |
 | ---------------- | ------------------------- | ----------------- |
@@ -213,19 +202,6 @@ curl -sL https://你的项目.你的子域.workers.dev/install.sh | bash -s inst
 | `WORKER_URL` | Worker 上报地址（必填） | -    |
 | `INTERVAL`   | 数据上报间隔（秒）       | `60` |
 
-**示例：**
-
-```bash
-# 默认60秒上报间隔
-curl -sL https://example.workers.dev/install.sh | bash -s install abc123 secret https://example.workers.dev/update
-
-# 30秒上报间隔（更实时）
-curl -sL https://example.workers.dev/install.sh | bash -s install abc123 secret https://example.workers.dev/update 30
-
-# 120秒上报间隔（节省资源）
-curl -sL https://example.workers.dev/install.sh | bash -s install abc123 secret https://example.workers.dev/update 120
-```
-
 > **注意**：上报间隔越短，数据越实时，但会增加 API 调用和数据库存储。建议根据服务器数量和网络状况选择合适的间隔。
 
 支持的系统：Ubuntu / Debian / CentOS / RHEL / Fedora / Rocky / AlmaLinux
@@ -240,7 +216,7 @@ curl -sL https://你的项目.你的子域.workers.dev/install.sh | bash -s unin
 
 ### 语言切换
 
-V2.0 版本支持中文和英文界面切换：
+支持中文和英文界面切换：
 
 1. 点击界面右上角的语言切换按钮
 2. 可实时在中文和英文之间切换
@@ -251,7 +227,7 @@ V2.0 版本支持中文和英文界面切换：
 访问 `https://你的项目.你的子域.workers.dev/` 查看：
 
 - **卡片视图**：服务器状态概览（含实时网速和本月流量）
-- **表格视图**：详细数据列表（含本月累计流量）
+- **表格视图**：详细数据列表
 - **地图视图**：全球服务器分布
 - **过滤器**：按国家筛选服务器
 
@@ -259,30 +235,20 @@ V2.0 版本支持中文和英文界面切换：
 
 点击任意服务器卡片进入详情页：
 
-- 实时 CPU/内存/磁盘/网络
+- 实时 CPU/内存/磁盘/网络/负载
 - 1/3/6/12/24 小时历史趋势图
 - 鼠标悬停查看具体时间点的数值
 - 国内三大运营商延迟追踪
 
+> **注意**：查看1小时以上的历史数据需要登录管理员账户。
+
 ### 主题切换
 
-管理后台支持 2 种主题：
-
-1. 默认黑色终端
-2. 白色终端
-3. 完全自定义 CSS
+管理后台支持自定义 CSS主题
 
 ### 拖拽排序
 
-在管理后台的服务器列表中，可以通过拖拽调整服务器的显示顺序：
-
-1. 进入管理后台 `/admin`
-2. 找到服务器列表最左侧的 `⋮⋮` 拖拽手柄
-3. 按住拖拽手柄上下拖动调整顺序
-4. 松开鼠标后自动保存排序
-5. 首页会按此排序显示服务器
-
-> **分组排序**：分组的顺序由该分组内第一个出现的服务器位置决定。
+在管理后台的服务器列表中，可以通过拖拽调整服务器的显示顺序
 
 ### 服务器隐藏
 
@@ -293,11 +259,23 @@ V2.0 版本支持中文和英文界面切换：
 3. 勾选 **Hide from Public** 选项
 4. 点击 **保存**
 
-> **隐藏效果**：
-> - 非登录状态下，首页不显示该服务器
-> - 非登录状态下，直接访问该服务器详情页返回 404
-> - 非登录状态下，所有相关 API 接口也无法访问该服务器数据
-> - 登录管理员后可正常查看所有服务器
+### 数据库管理
+
+管理后台提供数据库维护功能，可在 "Database Management" 标签页中找到：
+
+1. **升级数据库**：将数据库结构升级到最新版本，适用于旧版本用户升级
+   - 点击「Upgrade Database」按钮
+   - 确认升级操作
+   - 系统会自动执行数据库升级脚本
+2. **重建数据库**：清空并重建整个数据库（⚠️ 危险操作）
+   - 点击「Rebuild Database」按钮
+   - 确认重建操作（此操作将删除所有数据）
+   - 系统会清空并重新初始化数据库
+
+> **注意**：
+>
+> - 重建数据库是不可逆操作，请确保已备份重要数据
+> - 升级数据库不会删除现有数据，仅会更新表结构
 
 ## 🔔 离线告警配置
 
@@ -316,26 +294,6 @@ V2.0 版本支持中文和英文界面切换：
 2. 填入 Bot Token 字段
 3. Chat ID 留空
 
-## 📸 界面预览
-
-<img width="1903" height="1341" alt="image" src="https://github.com/user-attachments/assets/77344b37-c7ce-4bff-b820-cbd0b4b26579" />
-<img width="1907" height="683" alt="image" src="https://github.com/user-attachments/assets/48cf2f27-66d2-4b39-a5d3-ea9c5d5bb908" />
-<img width="1788" height="876" alt="image" src="https://github.com/user-attachments/assets/658e68e9-f858-408b-a603-537e55625701" />
-<img width="1788" height="1724" alt="image" src="https://github.com/user-attachments/assets/f2c1fc38-ecd9-48be-8fea-fbb5ff3aad51" />
-<img width="1788" height="1126" alt="image" src="https://github.com/user-attachments/assets/e28da6fb-915b-4417-a25c-faa7b3b11656" />
-<img width="1788" height="1480" alt="image" src="https://github.com/user-attachments/assets/4069d509-6ac9-4fa1-ade2-8eac43dbf6db" />
-<img width="1875" height="723" alt="image" src="https://github.com/user-attachments/assets/a806179f-8cb0-4713-b774-2741cb094a6f" />
-
-白色主题
-
-<img width="1788" height="1268" alt="image" src="https://github.com/user-attachments/assets/a229d14e-6099-4863-ad3d-3202fe2add58" />
-<img width="1904" height="671" alt="image" src="https://github.com/user-attachments/assets/48767b1b-f85e-48af-bd4f-cbe61c01d020" />
-<img width="1788" height="876" alt="image" src="https://github.com/user-attachments/assets/d8abbeb3-bb66-4be6-9d56-5cb42a579950" />
-<img width="1788" height="1126" alt="image" src="https://github.com/user-attachments/assets/9b4b9f4a-0e62-4ae6-87dc-e8c5a5306975" />
-<img width="1904" height="788" alt="image" src="https://github.com/user-attachments/assets/d0d53cf2-1d3d-4463-8b11-b92ca4eef8a3" />
-<img width="1903" height="705" alt="image" src="https://github.com/user-attachments/assets/acc08244-c0f1-438b-88cc-871879be09b7" />
-
-
 ## 🛠️ 本地开发
 
 ### 环境要求
@@ -349,10 +307,8 @@ V2.0 版本支持中文和英文界面切换：
 # 安装依赖
 npm install
 
-# 创建 D1 数据库
+# 创建 D1 数据库（首次）
 npx wrangler d1 create server-monitor-db
-
-# 更新 wrangler.toml 中的 database_id
 
 # 前端开发模式（热重载）
 npm run dev
@@ -360,36 +316,36 @@ npm run dev
 # 构建前端生产版本
 npm run build:frontend
 
-# 导入测试数据（可选）
-# 详见 /test/README.md
-
 # 部署到 Cloudflare Workers
 npm run deploy
 ```
 
 ### 本地测试数据
 
-V2.0 版本支持生成本地测试数据，方便在部署前进行功能测试：
+支持生成本地测试数据，方便在部署前进行功能测试：
 
 1. 进入 `test` 目录查看详细说明
 2. 运行测试数据生成脚本
 3. 导入生成的 SQL 数据到本地 D1 数据库
 4. 启动本地开发服务器进行测试
 
-## 📝 环境变量说明
+```
+node test/generate-sql.js
+wrangler d1 execute server-monitor-db --local --file=test/mock-data.sql
+```
 
-| 变量               | 说明                                     | 必需 |
-| ---------------- | -------------------------------------- | -- |
-| `API_SECRET`     | 探针认证密钥 + 管理后台密码                        | ✅  |
-| `D1_DATABASE_ID` | Cloudflare D1 数据库 ID                   | ✅  |
-| `CF_API_TOKEN`   | Cloudflare API Token（仅 GitHub Actions） | ✅  |
-| `CF_ACCOUNT_ID`  | Cloudflare 账户 ID（仅 GitHub Actions）     | ✅  |
-| `LONG_RETENTION` | 开启保留24小时，关闭仅保留1小时数据，默认关闭（true/false） | ❌  |
+详细步骤见 [test/README.md](test/README.md)
+
+## ⏰ 定时任务
+
+系统包含以下定时任务（UTC 时区）：
+
+| 任务   | 触发时间          | 说明                       |
+| ---- | ------------- | ------------------------ |
+| 数据清理 | `50 23 * * *` | 每天UTC 23:50 清理 3 天前的历史数据 |
+| 离线检测 | `*/1 * * * *` | 每分钟检测离线节点并发送告警           |
 
 ## ❓ 常见问题
-
-**Q: 部署后访问 404？**
-A: 确认 `wrangler.toml` 中的 `database_id` 已正确配置，且 D1 数据库已创建。
 
 **Q: 探针安装后不显示数据？**
 A: 检查服务器是否能访问 Worker URL，查看探针日志：`journalctl -u cf-probe -f`
@@ -398,7 +354,13 @@ A: 检查服务器是否能访问 Worker URL，查看探针日志：`journalctl 
 A: 更新 GitHub Secrets 中的 `API_SECRET`，重新部署，并在所有服务器上重新安装探针。
 
 **Q: D1 数据库免费额度够用吗？**
-A: Cloudflare D1 免费版提供 5GB 存储和 50 亿次读取/月，足以支持大量服务器监控。
+A: Cloudflare D1 免费版提供 5GB 存储和 5M 读取行/日、100K 写入行/日，足以支持服务器监控。
+
+**Q: 遇到其他异常问题怎么办？**
+A: 可以尝试在后台数据库管理中：
+- 升级数据库：尝试修复数据库结构问题
+- 重置数据库：清空并重建数据库（⚠️ 注意：此操作将清除所有数据，请确保已备份重要信息）
+
 
 ## 📄 许可证
 
@@ -406,10 +368,9 @@ MIT License
 
 ## 🙏 致谢
 
-- [CF-Server-Monitor-Pro](https://github.com/a63414262/CF-Server-Monitor-Pro)
+- [CF-Server-Monitor-Pro](https://github.com/a63414262/CF-Server-Monitor-Pro) 最初借鉴该项目，进行深度二次开发
 - [Cloudflare Workers](https://workers.cloudflare.com/)
 - [Vue 3](https://vuejs.org/)
 - [Vite](https://vitejs.dev/)
 - [Chart.js](https://www.chartjs.org/)
 - [Leaflet](https://leafletjs.com/)
-

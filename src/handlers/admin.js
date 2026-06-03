@@ -1,6 +1,7 @@
 import { checkAuth, authResponse } from '../middleware/auth.js';
 import { clearNotificationSettingsCache } from '../services/notification.js';
-import { getLatestMetricsForAllServers } from '../database/schema.js';
+import { getLatestMetricsForAllServers, getAllServers } from '../database/schema.js';
+import { clearServersListCache, clearServerDetailCache } from '../utils/cache.js';
 
 function isValidUUID(id) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -28,9 +29,7 @@ export async function handleAdminAPI(request, env, sys) {
       });
     }
     else if (data.action === 'list') {
-      const { results: servers } = await env.DB.prepare(
-        'SELECT id, name, server_group, price, expire_date, bandwidth, traffic_limit, is_hidden, sort_order FROM servers ORDER BY sort_order ASC'
-      ).all();
+      const servers = await getAllServers(env.DB);
 
       const latestMetricsMap = await getLatestMetricsForAllServers(env.DB);
       
@@ -130,6 +129,8 @@ export async function handleAdminAPI(request, env, sys) {
         VALUES (?, ?, ?, ?)
       `).bind(id, name, group, sortOrder).run();
       
+      clearServersListCache();
+      
       return new Response(JSON.stringify({ 
         success: true, 
         id: id,
@@ -152,6 +153,9 @@ export async function handleAdminAPI(request, env, sys) {
       
       await env.DB.prepare('DELETE FROM metrics_history WHERE server_id = ?').bind(id).run();
       await env.DB.prepare('DELETE FROM servers WHERE id = ?').bind(id).run();
+      
+      clearServersListCache();
+      clearServerDetailCache(id);
       
       return new Response(JSON.stringify({ 
         success: true, 
@@ -181,6 +185,8 @@ export async function handleAdminAPI(request, env, sys) {
         }
         await env.DB.prepare('UPDATE servers SET sort_order = ? WHERE id = ?').bind(i, orders[i]).run();
       }
+      
+      clearServersListCache();
       
       return new Response(JSON.stringify({ 
         success: true, 
@@ -232,6 +238,8 @@ export async function handleAdminAPI(request, env, sys) {
         ).run();
       }
       
+      clearServersListCache();
+      
       return new Response(JSON.stringify({ 
         success: true, 
         message: {
@@ -264,6 +272,11 @@ export async function handleAdminAPI(request, env, sys) {
       await env.DB.prepare(`DELETE FROM metrics_history WHERE server_id IN (${placeholders})`).bind(...ids).run();
       await env.DB.prepare(`DELETE FROM servers WHERE id IN (${placeholders})`).bind(...ids).run();
       
+      clearServersListCache();
+      for (const id of ids) {
+        clearServerDetailCache(id);
+      }
+      
       return new Response(JSON.stringify({ 
         success: true, 
         message: {
@@ -275,9 +288,7 @@ export async function handleAdminAPI(request, env, sys) {
       });
     }
     else if (data.action === 'get_stats') {
-      const { results: servers } = await env.DB.prepare(
-        'SELECT id, name FROM servers'
-      ).all();
+      const servers = await getAllServers(env.DB);
       
       const latestMetricsMap = await getLatestMetricsForAllServers(env.DB);
       

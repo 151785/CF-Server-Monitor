@@ -1,10 +1,10 @@
 import { checkAuth, simpleAuthResponse } from '../middleware/auth.js';
-import { getLatestMetrics, getLatestMetricsForAllServers } from '../database/schema.js';
+import { getLatestMetrics, getLatestMetricsForAllServers, getAllServers } from '../database/schema.js';
+import { getServerDetail } from '../utils/cache.js';
 
 export async function handleServerAPI(request, env, sys) {
   const isLoggedIn = checkAuth(request, env);
   
-  // 如果关闭了公开访问，需要登录
   if (sys.is_public !== 'true' && !isLoggedIn) {
     return simpleAuthResponse();
   }
@@ -13,12 +13,8 @@ export async function handleServerAPI(request, env, sys) {
   const id = url.searchParams.get('id');
   
   if (!id) return new Response('Missing ID', { status: 400 });
-  let query = 'SELECT * FROM servers WHERE id = ?';
-  if (!isLoggedIn) {
-    query += " AND (is_hidden != '1' AND is_hidden != 1)";
-  }
   
-  const server = await env.DB.prepare(query).bind(id).first();
+  const server = await getServerDetail(env.DB, id, isLoggedIn);
   if (!server) return new Response('Not Found', { status: 404 });
   
   const latestMetrics = await getLatestMetrics(env.DB, id);
@@ -69,13 +65,7 @@ export async function handleServersAPI(request, env, sys) {
     return simpleAuthResponse();
   }
   
-  let query = 'SELECT * FROM servers';
-  if (!isLoggedIn) {
-    query += " WHERE (is_hidden != '1' AND is_hidden != 1)";
-  }
-  query += ' ORDER BY sort_order ASC';
-  
-  const { results } = await env.DB.prepare(query).all();
+  const results = await getAllServers(env.DB, isLoggedIn);
   
   const latestMetricsMap = await getLatestMetricsForAllServers(env.DB);
   

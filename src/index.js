@@ -6,10 +6,9 @@ import { serveFrontend } from './handlers/frontend.js';
 import { handleUpdate } from './handlers/update.js';
 import { handleServerAPI, handleServersAPI } from './handlers/dashboard.js';
 import { loadSettings } from './utils/settings.js';
-import { checkAuth, authResponse, simpleAuthResponse } from './middleware/auth.js';
+import { checkAuth, simpleAuthResponse } from './middleware/auth.js';
+import { getServerDetail, getMetricsHistoryCache, setMetricsHistoryCache } from './utils/cache.js';
 
-const historyCache = new Map();
-const CACHE_TTL = 60000;
 async function fetchHistoryData(env, request, id, hours, columns) {
   if (!id) return new Response('Missing ID', { status: 400 });
   
@@ -24,18 +23,13 @@ async function fetchHistoryData(env, request, id, hours, columns) {
     return new Response('Unauthorized', { status: 401 });
   }
   
-  let query = 'SELECT id FROM servers WHERE id = ?';
-  if (!isLoggedIn) {
-    query += " AND (is_hidden != '1' AND is_hidden != 1)";
-  }
-  const server = await env.DB.prepare(query).bind(id).first();
+  const server = await getServerDetail(env.DB, id, isLoggedIn);
   if (!server) return new Response('Not Found', { status: 404 });
   
   const clampedHours = Math.min(hours, 72);
   
-  const cacheKey = `${id}_${clampedHours}_${columns}`;
-  const cached = historyCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+  const cached = getMetricsHistoryCache(id, clampedHours, columns);
+  if (cached && Date.now() - cached.timestamp < 60000) {
     return new Response(JSON.stringify(cached.data), {
       headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT' }
     });
@@ -43,10 +37,7 @@ async function fetchHistoryData(env, request, id, hours, columns) {
   
   const data = await getMetricsHistory(env.DB, id, clampedHours, columns);
   
-  historyCache.set(cacheKey, {
-    timestamp: Date.now(),
-    data: data
-  });
+  setMetricsHistoryCache(id, clampedHours, columns, data);
   
   return new Response(JSON.stringify(data), {
     headers: { 'Content-Type': 'application/json', 'X-Cache': 'MISS' }
