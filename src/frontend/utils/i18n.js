@@ -250,7 +250,10 @@ const translations = reactive({
     databaseRebuiltSuccess: 'Database rebuilt successfully',
     databaseRebuiltFailed: 'Database rebuild failed',
     databaseUpgradeSuccess: 'Database upgrade successful',
-    databaseUpgradeFailed: 'Database upgrade failed'
+    databaseUpgradeFailed: 'Database upgrade failed',
+    adminDisabled: 'Admin Panel Disabled',
+    adminDisabledDesc: 'Admin panel is disabled when using remote API mode.',
+    backToDashboard: 'Back to Dashboard'
   },
   zh: {
     theme: '主题',
@@ -500,7 +503,10 @@ const translations = reactive({
     databaseRebuiltSuccess: '数据库重建成功',
     databaseRebuiltFailed: '数据库重建失败',
     databaseUpgradeSuccess: '数据库更新成功',
-    databaseUpgradeFailed: '数据库更新失败'
+    databaseUpgradeFailed: '数据库更新失败',
+    adminDisabled: '管理面板已禁用',
+    adminDisabledDesc: '使用远程 API 模式时，管理面板已禁用。',
+    backToDashboard: '返回仪表盘'
   }
 })
 

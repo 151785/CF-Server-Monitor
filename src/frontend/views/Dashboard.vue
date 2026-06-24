@@ -81,6 +81,7 @@
               :key="server.id" 
               :server="server"
               :sys-config="sysConfig"
+              :to="getServerLink(server)"
             />
           </div>
         </div>
@@ -118,7 +119,7 @@
             <tr 
               v-for="server in filteredServers" 
               :key="server.id"
-              @click="goToServer(server.id)"
+              @click="goToServer(server)"
               class="table-cursor-pointer"
               :data-region="(server.region || 'xx').toLowerCase()"
             >
@@ -192,7 +193,7 @@ import { useRouter } from 'vue-router'
 import TerminalHeader from '../components/TerminalHeader.vue'
 import ServerCard from '../components/ServerCard.vue'
 import Footer from '../components/Footer.vue'
-import { fetchServers, formatBytes, createLiveSocket, getFlagRegionCode } from '../utils/api.js'
+import { fetchServers, fetchServersAll, formatBytes, createLiveSocket, getFlagRegionCode, getApiBases } from '../utils/api.js'
 import { t, currentLang } from '../utils/i18n.js'
 import { translations } from '../utils/i18n.js'
 import { TIME } from '../utils/constants'
@@ -374,18 +375,17 @@ const recomputeStats = () => {
 
 const refreshData = async () => {
   try {
-    const data = await fetchServers()
+    const bases = getApiBases()
+    const data = bases.length > 0 ? await fetchServersAll() : await fetchServers()
     if (!data) return
 
     const rawServers = Array.isArray(data.servers)
       ? data.servers
       : Object.entries(data.latestMetricsMap || {}).map(([id, metrics]) => ({ id, ...metrics }))
 
-    // 合并已有列表与最新服务端全量数据（优先使用服务端返回的 name/group 等完整字段）
     const existingById = new Map(servers.value.map(s => [s.id, s]))
     const nextList = rawServers.map(s => {
       const prev = existingById.get(s.id)
-      // 取服务端返回作为权威数据，并保留本地字段以防服务端缺少
       return { ...prev, ...s }
     })
     servers.value = nextList
@@ -399,7 +399,6 @@ const refreshData = async () => {
       }
       regionStats.value = cleaned
     }
-    // 始终基于当前服务器列表计算未知国家数量（与 recomputeStats 保持一致）
     let unknownCount = 0
     for (const s of servers.value) {
       if (!s.region) unknownCount++
@@ -427,7 +426,7 @@ const refreshData = async () => {
 //   - 订阅 "all"，收到任何服务器的更新都会合并对应 server 的指标
 //   - WS 连上后关闭 60s 兜底轮询；断开后临时开启作为降级（WS 重连成功后再次清除）
 // -------------------------------------------------------------------------
-let liveSocket = null
+let liveSockets = []
 let refreshInterval = null
 let themeObserver = null
 let timeUpdateInterval = null
@@ -440,18 +439,41 @@ const applyLiveUpdate = ({ serverId, data }) => {
 }
 
 const startLiveSocket = () => {
-  liveSocket = createLiveSocket('all', {
-    onUpdate: applyLiveUpdate,
-    onStatus: ({ connected }) => {
-      liveConnected.value = !!connected
-      if (connected) {
-        // WS 可用，清除定时轮询
-        if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null }
-      } else if (!refreshInterval) {
-        // WS 断开，降级启用 60s 轮询直到重连成功
-        refreshInterval = setInterval(refreshData, 60000)
+  const bases = getApiBases()
+
+  // 如果没有配置多个 API bases，使用原来的单连接方式
+  if (bases.length === 0) {
+    liveSockets = [createLiveSocket('all', {
+      onUpdate: applyLiveUpdate,
+      onStatus: ({ connected }) => {
+        liveConnected.value = !!connected
+        if (connected) {
+          if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null }
+        } else if (!refreshInterval) {
+          refreshInterval = setInterval(refreshData, 60000)
+        }
       }
-    }
+    })]
+    return
+  }
+
+  // 为每个 API base 创建独立的 WebSocket 连接
+  liveSockets = bases.map((_, index) => {
+    return createLiveSocket('all', {
+      onUpdate: applyLiveUpdate,
+      onStatus: ({ connected }) => {
+        // 只要有一个连接成功，就认为实时推送可用
+        const anyConnected = liveSockets.some(s => s && s.isConnected)
+        liveConnected.value = anyConnected
+
+        if (anyConnected) {
+          if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null }
+        } else if (!refreshInterval) {
+          // 所有连接都断开时，启用降级轮询
+          refreshInterval = setInterval(refreshData, 60000)
+        }
+      }
+    }, index)
   })
 }
 
@@ -572,8 +594,18 @@ const drawMarkers = () => {
   }
 }
 
-const goToServer = (id) => {
-  router.push(`/server/${id}`)
+const getServerLink = (server) => {
+  const bases = getApiBases()
+  if (bases.length === 0) return `/server/${server.id}`
+  
+  const apiIndex = bases.indexOf(server.source)
+  if (apiIndex === -1 || apiIndex === 0) return `/server/${server.id}`
+  
+  return `/server/${server.id}?apiIndex=${apiIndex}`
+}
+
+const goToServer = (server) => {
+  router.push(getServerLink(server))
 }
 
 onMounted(() => {
@@ -605,7 +637,11 @@ onMounted(() => {
 onUnmounted(() => {
   if (refreshInterval) clearInterval(refreshInterval)
   if (timeUpdateInterval) clearInterval(timeUpdateInterval)
-  if (liveSocket) liveSocket.close()
+  if (liveSockets.length > 0) {
+    liveSockets.forEach(socket => {
+      if (socket) socket.close()
+    })
+  }
   if (themeObserver) themeObserver.disconnect()
 })
 </script>

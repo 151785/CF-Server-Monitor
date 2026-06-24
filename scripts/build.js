@@ -24,14 +24,16 @@ if (fs.existsSync(path.join(rootDir, '.env'))) {
   for (const line of lines) {
     const match = line.match(/^\s*API_BASE_URL\s*=\s*["']?(.+?)["']?\s*$/);
     if (match) {
-      envConfig.apiBase = match[1];
+      const value = match[1];
+      const urls = value.split(',').map(u => u.trim()).filter(u => u);
+      envConfig.apiBase = urls.length > 1 ? urls : (urls.length === 1 ? urls[0] : '');
       break;
     }
   }
 }
 const configJsonPath = path.join(distDir, 'config.json');
 fs.writeFileSync(configJsonPath, JSON.stringify({ apiBase: envConfig.apiBase || '' }, null, 2), 'utf8');
-console.log(`Generated config.json with apiBase: ${envConfig.apiBase || '(empty)'}`);
+console.log(`Generated config.json with apiBase: ${JSON.stringify(envConfig.apiBase || '(empty)')}`);
 
 console.log('Copying static assets...');
 if (fs.existsSync(publicDir)) {

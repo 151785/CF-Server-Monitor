@@ -1,9 +1,5 @@
-// Frontend runtime configuration loader.
-// Reads /config.json on app startup, exposes the API base URL globally,
-// and falls back to the current page origin when the file is missing,
-// unreadable, or contains an empty apiBase value.
-
 let apiBase = null
+let apiBases = []
 let wsBase = null
 
 const stripTrailingSlash = (s) => String(s || '').replace(/\/+$/, '')
@@ -28,17 +24,22 @@ const computeWsBase = (origin) => {
 }
 
 const setApiBase = (value) => {
-  const cleaned = stripTrailingSlash(value)
-  apiBase = cleaned || stripTrailingSlash(window.location.origin)
+  if (Array.isArray(value)) {
+    apiBases = value.map(v => stripTrailingSlash(v)).filter(v => v)
+    apiBase = apiBases.length > 0 ? apiBases[0] : stripTrailingSlash(window.location.origin)
+  } else {
+    apiBases = []
+    const cleaned = stripTrailingSlash(value)
+    apiBase = cleaned || stripTrailingSlash(window.location.origin)
+  }
   wsBase = computeWsBase(apiBase)
-  // Expose for debugging / non-module consumers
   window.__APP_API_BASE__ = apiBase
   window.__APP_WS_BASE__ = wsBase
+  window.__APP_API_BASES__ = apiBases
   return apiBase
 }
 
 export const initConfig = async () => {
-  // Default to current origin in case the fetch fails
   setApiBase(window.location.origin)
   try {
     const res = await fetch(`/config.json?t=${Date.now()}`, {
@@ -47,8 +48,12 @@ export const initConfig = async () => {
     })
     if (res && res.ok) {
       const data = await res.json()
-      if (data && typeof data.apiBase === 'string' && data.apiBase.trim()) {
-        setApiBase(data.apiBase.trim())
+      if (data && data.apiBase) {
+        if (Array.isArray(data.apiBase)) {
+          setApiBase(data.apiBase.filter(u => typeof u === 'string' && u.trim()))
+        } else if (typeof data.apiBase === 'string' && data.apiBase.trim()) {
+          setApiBase(data.apiBase.trim())
+        }
       }
     }
   } catch (e) {
@@ -63,10 +68,20 @@ export const getApiBase = () => {
   return stripTrailingSlash(window.location.origin)
 }
 
+export const getApiBases = () => {
+  if (apiBases.length > 0) return apiBases
+  if (window.__APP_API_BASES__) return window.__APP_API_BASES__
+  return []
+}
+
 export const getWsBase = () => {
   if (wsBase) return wsBase
   if (window.__APP_WS_BASE__) return window.__APP_WS_BASE__
   return computeWsBase(getApiBase())
 }
 
-export default { initConfig, getApiBase, getWsBase }
+export const hasMultipleApiBases = () => {
+  return getApiBases().length > 1
+}
+
+export default { initConfig, getApiBase, getApiBases, getWsBase, hasMultipleApiBases }

@@ -1,12 +1,12 @@
 import { http, isAdminLoggedIn } from './http'
-import { getApiBase, getWsBase } from './config'
+import { getApiBase, getApiBases, getWsBase } from './config'
 import { ref } from 'vue'
 
-export { getApiBase, getWsBase }
+export { getApiBase, getApiBases, getWsBase }
 
 export const VERSION = ref('')
 
-export const createLiveSocket = (subscribe, handlers = {}) => {
+export const createLiveSocket = (subscribe, handlers = {}, apiIndex = 0) => {
   const { onUpdate, onStatus, onMessage } = handlers
   const scope = (subscribe || 'all').toLowerCase()
   let ws = null
@@ -16,8 +16,24 @@ export const createLiveSocket = (subscribe, handlers = {}) => {
   let reconnectAttempts = 0
   const MAX_DELAY = 30000
   const MAX_RECONNECT_ATTEMPTS = 10
+  let isConnected = false
+
+  const getWsBaseByIndex = (index) => {
+    const bases = getApiBases()
+    if (bases.length > 0 && bases[index]) {
+      try {
+        const u = new URL(bases[index])
+        const wsProto = u.protocol === 'https:' ? 'wss:' : 'ws:'
+        return `${wsProto}//${u.host}`
+      } catch (_) {
+        return `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`
+      }
+    }
+    return getWsBase()
+  }
 
   const setStatus = (connected, reason) => {
+    isConnected = connected
     if (typeof onStatus === 'function') {
       onStatus({ connected, reason: reason || '' })
     }
@@ -26,7 +42,7 @@ export const createLiveSocket = (subscribe, handlers = {}) => {
   const connect = () => {
     manualClose = false
     try {
-      ws = new WebSocket(`${getWsBase()}/api/ws?subscribe=${encodeURIComponent(scope)}`)
+      ws = new WebSocket(`${getWsBaseByIndex(apiIndex)}/api/ws?subscribe=${encodeURIComponent(scope)}`)
     } catch (e) {
       setStatus(false, 'WebSocket not supported')
       return
@@ -94,6 +110,9 @@ export const createLiveSocket = (subscribe, handlers = {}) => {
       if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
       if (ws) { try { ws.close() } catch (_) {} ws = null }
       connect()
+    },
+    get isConnected() {
+      return isConnected
     }
   }
 }
@@ -110,7 +129,6 @@ export const formatBytes = (bytes) => {
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
-  // 确保 i 在有效范围内（防止负数索引或超出数组范围）
   const safeIndex = Math.max(0, Math.min(i, sizes.length - 1))
   return parseFloat((bytes / Math.pow(k, safeIndex)).toFixed(2)) + ' ' + sizes[safeIndex]
 }
@@ -121,14 +139,70 @@ export const fetchServers = async () => {
   return result.data
 }
 
-export const fetchServerDetail = async (id) => {
-  const result = await http.get(`/api/server?id=${id}`)
+export const fetchServersAll = async () => {
+  const results = await http.getAll('/api/servers', { includeAuth: false, includeTurnstile: false })
+  const mergedData = {
+    servers: [],
+    stats: { total: 0, online: 0, offline: 0, globalNetRx: 0, globalNetTx: 0, globalSpeedIn: 0, globalSpeedOut: 0 },
+    regionStats: {},
+    sysConfig: {
+      show_price: true,
+      show_expire: true,
+      show_bw: true,
+      show_tf: true,
+      site_title: 'Server Monitor'
+    }
+  }
+
+  for (const { data, error, baseUrl } of results) {
+    if (error || !data) continue
+
+    const rawServers = Array.isArray(data.servers)
+      ? data.servers
+      : Object.entries(data.latestMetricsMap || {}).map(([id, metrics]) => ({ id, ...metrics }))
+
+    for (const server of rawServers) {
+      mergedData.servers.push({ ...server, source: baseUrl })
+    }
+
+    if (data.stats) {
+      mergedData.stats.total += data.stats.total || 0
+      mergedData.stats.online += data.stats.online || 0
+      mergedData.stats.offline += data.stats.offline || 0
+      mergedData.stats.globalNetRx += data.stats.globalNetRx || 0
+      mergedData.stats.globalNetTx += data.stats.globalNetTx || 0
+      mergedData.stats.globalSpeedIn += data.stats.globalSpeedIn || 0
+      mergedData.stats.globalSpeedOut += data.stats.globalSpeedOut || 0
+    }
+
+    if (data.regionStats) {
+      for (const code in data.regionStats) {
+        mergedData.regionStats[code] = (mergedData.regionStats[code] || 0) + data.regionStats[code]
+      }
+    }
+
+    if (data.sysConfig) {
+      mergedData.sysConfig = {
+        show_price: data.sysConfig.show_price ?? mergedData.sysConfig.show_price,
+        show_expire: data.sysConfig.show_expire ?? mergedData.sysConfig.show_expire,
+        show_bw: data.sysConfig.show_bw ?? mergedData.sysConfig.show_bw,
+        show_tf: data.sysConfig.show_tf ?? mergedData.sysConfig.show_tf,
+        site_title: data.sysConfig.site_title || mergedData.sysConfig.site_title
+      }
+    }
+  }
+
+  return mergedData
+}
+
+export const fetchServerDetail = async (id, apiIndex = 0) => {
+  const result = await http.getByIndex(`/api/server?id=${id}`, apiIndex)
   if (result.error) return null
   return result.data
 }
 
-export const fetchAllHistory = async (id, hours) => {
-  const result = await http.get(`/api/history/all?id=${id}&hours=${hours}`)
+export const fetchAllHistory = async (id, hours, apiIndex = 0) => {
+  const result = await http.getByIndex(`/api/history/all?id=${id}&hours=${hours}`, apiIndex)
   if (result.error) {
     const error = new Error(result.error)
     error.code = result.code

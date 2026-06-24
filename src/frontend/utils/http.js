@@ -1,4 +1,4 @@
-import { getApiBase } from './config'
+import { getApiBase, getApiBases } from './config'
 
 const DEFAULT_ERROR_MESSAGES = {
   401: 'Unauthorized',
@@ -79,10 +79,8 @@ const handleResponse = async (res, options = {}) => {
   
   try {
     const data = await res.json()
-    // Store turnstile_verified from body if present
     if (data && data.turnstile_verified) {
       localStorage.setItem('turnstile_verified', data.turnstile_verified)
-      // Clear one-time turnstile token after successful verification
       localStorage.removeItem('turnstile_token')
     }
     return { data, status: res.status }
@@ -91,12 +89,28 @@ const handleResponse = async (res, options = {}) => {
   }
 }
 
+const fetchWithBase = async (baseUrl, url, options, method = 'GET', body = null) => {
+  const { includeAuth = true, includeTurnstile = true, autoRedirect = true } = options
+  const headers = createHeaders(includeAuth, includeTurnstile)
+
+  const res = await fetch(`${baseUrl}${url}`, {
+    method,
+    headers,
+    body,
+    credentials: 'include'
+  })
+
+  const result = await handleResponse(res, { autoRedirect })
+  return { ...result, baseUrl }
+}
+
 export const http = {
   async get(url, options = {}) {
-    const { includeAuth = true, includeTurnstile = true, autoRedirect = true } = options
+    const { includeAuth = true, includeTurnstile = true, autoRedirect = true, baseUrl = null } = options
     const headers = createHeaders(includeAuth, includeTurnstile)
+    const base = baseUrl || getApiBase()
 
-    const res = await fetch(`${getApiBase()}${url}`, {
+    const res = await fetch(`${base}${url}`, {
       method: 'GET',
       headers,
       credentials: 'include'
@@ -106,10 +120,11 @@ export const http = {
   },
 
   async post(url, body = {}, options = {}) {
-    const { includeAuth = true, includeTurnstile = true, autoRedirect = true } = options
+    const { includeAuth = true, includeTurnstile = true, autoRedirect = true, baseUrl = null } = options
     const headers = createHeaders(includeAuth, includeTurnstile)
+    const base = baseUrl || getApiBase()
 
-    const res = await fetch(`${getApiBase()}${url}`, {
+    const res = await fetch(`${base}${url}`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
@@ -120,10 +135,11 @@ export const http = {
   },
 
   async put(url, body = {}, options = {}) {
-    const { includeAuth = true, includeTurnstile = true, autoRedirect = true } = options
+    const { includeAuth = true, includeTurnstile = true, autoRedirect = true, baseUrl = null } = options
     const headers = createHeaders(includeAuth, includeTurnstile)
+    const base = baseUrl || getApiBase()
 
-    const res = await fetch(`${getApiBase()}${url}`, {
+    const res = await fetch(`${base}${url}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(body),
@@ -134,16 +150,69 @@ export const http = {
   },
 
   async delete(url, options = {}) {
-    const { includeAuth = true, includeTurnstile = true, autoRedirect = true } = options
+    const { includeAuth = true, includeTurnstile = true, autoRedirect = true, baseUrl = null } = options
     const headers = createHeaders(includeAuth, includeTurnstile)
+    const base = baseUrl || getApiBase()
 
-    const res = await fetch(`${getApiBase()}${url}`, {
+    const res = await fetch(`${base}${url}`, {
       method: 'DELETE',
       headers,
       credentials: 'include'
     })
 
     return handleResponse(res, { autoRedirect })
+  },
+
+  async getAll(url, options = {}) {
+    const bases = getApiBases()
+    if (bases.length === 0) {
+      const result = await this.get(url, options)
+      return [{ ...result, baseUrl: getApiBase() }]
+    }
+
+    const promises = bases.map(baseUrl => 
+      fetchWithBase(baseUrl, url, options, 'GET', null)
+    )
+
+    const results = await Promise.all(promises)
+    return results
+  },
+
+  async postAll(url, body = {}, options = {}) {
+    const bases = getApiBases()
+    if (bases.length === 0) {
+      const result = await this.post(url, body, options)
+      return [{ ...result, baseUrl: getApiBase() }]
+    }
+
+    const promises = bases.map(baseUrl => 
+      fetchWithBase(baseUrl, url, options, 'POST', JSON.stringify(body))
+    )
+
+    const results = await Promise.all(promises)
+    return results
+  },
+
+  async getByIndex(url, index = 0, options = {}) {
+    const bases = getApiBases()
+    let baseUrl
+    if (bases.length > 0 && bases[index] !== undefined) {
+      baseUrl = bases[index]
+    } else {
+      baseUrl = getApiBase()
+    }
+    return this.get(url, { ...options, baseUrl })
+  },
+
+  async postByIndex(url, body = {}, index = 0, options = {}) {
+    const bases = getApiBases()
+    let baseUrl
+    if (bases.length > 0 && bases[index] !== undefined) {
+      baseUrl = bases[index]
+    } else {
+      baseUrl = getApiBase()
+    }
+    return this.post(url, body, { ...options, baseUrl })
   }
 }
 

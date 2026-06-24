@@ -1,5 +1,5 @@
 <template>
-  <router-link :to="'/server/' + server.id" class="server-card" :data-region="regionCode">
+  <router-link :to="to" class="server-card" :data-region="regionCode">
     <div class="server-card-header">
       <div class="server-identity">
         <div class="status-indicator" :style="{ background: statusColor, boxShadow: '0 0 8px ' + statusColor }"></div>
@@ -104,6 +104,10 @@ const props = defineProps({
       show_bw: true,
       show_tf: true
     })
+  },
+  to: {
+    type: String,
+    default: ''
   }
 })
 

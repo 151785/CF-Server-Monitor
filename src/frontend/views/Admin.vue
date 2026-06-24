@@ -1,6 +1,15 @@
 <template>
   <div>
-    <div v-if="!isLoggedIn" id="login-overlay" class="login-overlay">
+    <div v-if="isRemoteMode" class="remote-mode-disabled">
+      <div class="disabled-container">
+        <div class="disabled-icon">🔒</div>
+        <h2 class="disabled-title">{{ trans.adminDisabled }}</h2>
+        <p class="disabled-desc">{{ trans.adminDisabledDesc }}</p>
+        <router-link to="/" class="btn btn-primary mt-4">← {{ trans.backToDashboard }}</router-link>
+      </div>
+    </div>
+    <div v-else>
+      <div v-if="!isLoggedIn" id="login-overlay" class="login-overlay">
       <div class="login-container">
         <div class="login-header">
           <div class="login-icon">🔐</div>
@@ -827,6 +836,7 @@
 
       <Footer />
     </div>
+    </div>
   </div>
 </template>
 
@@ -834,7 +844,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import TerminalHeader from '../components/TerminalHeader.vue'
 import Footer from '../components/Footer.vue'
-import { adminApi, login, logout as apiLogout, formatBytes, upgradeDatabase, rebuildDatabase, getFlagRegionCode, getApiBase } from '../utils/api'
+import { adminApi, login, logout as apiLogout, formatBytes, upgradeDatabase, rebuildDatabase, getFlagRegionCode, getApiBase, getApiBases } from '../utils/api'
 import { t, currentLang } from '../utils/i18n'
 import { translations } from '../utils/i18n'
 import { http } from '../utils/http'
@@ -857,6 +867,14 @@ const getUsagePercent = (used, limit) => {
 }
 
 const currentOrigin = computed(() => window.location.origin)
+
+const isRemoteMode = computed(() => {
+  const bases = getApiBases()
+  if (bases.length > 0) return true
+  const apiBase = getApiBase()
+  if (!apiBase) return false
+  return apiBase !== window.location.origin
+})
 
 const isLoggedIn = ref(false)
 const loginForm = ref({ username: '', password: '' })

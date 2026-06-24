@@ -279,7 +279,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TerminalHeader from '../components/TerminalHeader.vue'
 import Footer from '../components/Footer.vue'
-import { fetchServerDetail, fetchAllHistory, formatBytes, isAdminLoggedIn, createLiveSocket, getFlagRegionCode } from '../utils/api.js'
+import { fetchServerDetail, fetchAllHistory, formatBytes, isAdminLoggedIn, createLiveSocket, getFlagRegionCode, getApiBases } from '../utils/api.js'
 import Chart from 'chart.js/auto'
 import 'chartjs-adapter-date-fns'
 import { t, currentLang, translations } from '../utils/i18n'
@@ -297,6 +297,12 @@ if (!serverId) {
 
 if (!serverId) {
   router.push('/')
+}
+
+const apiIndex = ref(0)
+const indexParam = route.query.apiIndex
+if (indexParam !== undefined && indexParam !== null && !isNaN(parseInt(indexParam))) {
+  apiIndex.value = parseInt(indexParam)
 }
 
 const server = ref({})
@@ -933,7 +939,7 @@ const updateLoadChart = (chart, dataPoints) => {
 
 const loadAllHistory = async (hours) => {
   try {
-    const res = await fetchAllHistory(serverId, hours)
+    const res = await fetchAllHistory(serverId, hours, apiIndex.value)
     if (!res) return
     const allData = res
     hasLossHistoryData.value = allData.some(item => ['loss_ct', 'loss_cu', 'loss_cm', 'loss_bd'].some(key => isLossValid(item[key])))
@@ -1043,7 +1049,7 @@ const fetchCurrentStatus = async (incomingData) => {
   try {
     let data = incomingData
     if (!data) {
-      data = await fetchServerDetail(serverId)
+      data = await fetchServerDetail(serverId, apiIndex.value)
       if (!data) return
     }
     if (!data || !data.last_updated) return
@@ -1178,7 +1184,7 @@ const init = async () => {
         statusTimer = setInterval(() => fetchCurrentStatus(), TIME.POLL_INTERVAL_MS)
       }
     }
-  })
+  }, apiIndex.value)
 }
 
 watch([cpuChartRef, gpuChartRef, ramChartRef, diskChartRef, netChartRef, procChartRef, connChartRef, pingChartRef, lossChartRef, loadChartRef], () => {
