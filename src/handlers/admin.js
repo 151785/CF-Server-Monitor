@@ -327,7 +327,10 @@ export async function handleAdminAPI(request, env, sys) {
       }
       try {
         const testMsg = `✅ **测试通知**\n\n这是一条来自 CF Server Monitor 的测试消息。\n\n**时间:** ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`;
-        await sendNotification({ tg_bot_token, tg_chat_id: tg_chat_id || '' }, testMsg);
+        const result = await sendNotification({ tg_bot_token, tg_chat_id: tg_chat_id || '' }, testMsg);
+        if(result) {
+          return createBadRequestResponse(result);
+        }
         return createSuccessResponse({ success: true, message: 'testNotificationSent' });
       } catch (e) {
         return createBadRequestResponse('testNotificationFailed');

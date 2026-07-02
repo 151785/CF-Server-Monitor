@@ -40,7 +40,7 @@ export async function sendNotification(settings, msg) {
         })
       });
     } catch (e) {
-      console.error('Telegram 通知发送失败:', e);
+      return "Telegram 通知发送失败: " + e.message;
     }
   }else{
     try {
@@ -53,7 +53,7 @@ export async function sendNotification(settings, msg) {
         })
       });
     } catch (e) {
-      console.error('企业微信通知发送失败:', e);
+      return "企业微信通知发送失败: " + e.message;
     }
   }
 }
