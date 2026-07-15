@@ -70,7 +70,9 @@ function injectAppearanceSettings(html, settings) {
 
   if (staticDomains.length > 0 || apiDomains.length > 0) {
     const turnstileDomain = 'https://challenges.cloudflare.com';
-    const newDomains = [...staticDomains, ...apiDomains];
+    const insightsDomain = 'https://static.cloudflareinsights.com';
+    const fontsApiDomain = 'https://fonts.googleapis.com';
+    const fontsStaticDomain = 'https://fonts.gstatic.com';
 
     // 从现有 CSP 中提取已有域名
     const cspMatch = modifiedHtml.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/);
@@ -79,17 +81,41 @@ function injectAppearanceSettings(html, settings) {
       const domainRegex = /https?:\/\/[^\s';]+|wss?:\/\/[^\s';]+/g;
       const existingDomains = existingCsp.match(domainRegex) || [];
 
-      // 合并域名（去重）
-      const mergedDomains = [...new Set([...existingDomains, ...newDomains])].join(' ');
+      // 按指令分类域名
+      const scriptSrcDomains = [...new Set([
+        ...existingDomains.filter(d => ['https://challenges.cloudflare.com', 'https://static.cloudflareinsights.com'].includes(d)),
+        ...staticDomains
+      ])].join(' ');
+
+      const styleSrcDomains = [...new Set([
+        ...existingDomains.filter(d => ['https://challenges.cloudflare.com', 'https://fonts.googleapis.com'].includes(d)),
+        ...staticDomains
+      ])].join(' ');
+
+      const imgSrcDomains = [...new Set([
+        ...existingDomains.filter(d => ['https://challenges.cloudflare.com'].includes(d)),
+        ...staticDomains
+      ])].join(' ');
+
+      const fontSrcDomains = [...new Set([
+        ...existingDomains.filter(d => ['https://challenges.cloudflare.com', 'https://fonts.gstatic.com'].includes(d)),
+        ...staticDomains
+      ])].join(' ');
+
+      const connectSrcDomains = [...new Set([
+        ...existingDomains.filter(d => ['https://challenges.cloudflare.com', 'https://static.cloudflareinsights.com'].includes(d)),
+        ...staticDomains,
+        ...apiDomains
+      ])].join(' ');
 
       // 构建新的 CSP
       const newCsp = [
         `default-src 'self'`,
-        `script-src 'self' 'unsafe-inline' ${mergedDomains}`,
-        `style-src 'self' 'unsafe-inline' ${mergedDomains}`,
-        `img-src 'self' ${mergedDomains} data:`,
-        `font-src 'self' ${mergedDomains}`,
-        `connect-src 'self' ${mergedDomains}`,
+        `script-src 'self' 'unsafe-inline' ${scriptSrcDomains}`,
+        `style-src 'self' 'unsafe-inline' ${styleSrcDomains}`,
+        `img-src 'self' ${imgSrcDomains} data:`,
+        `font-src 'self' ${fontSrcDomains}`,
+        `connect-src 'self' ${connectSrcDomains}`,
         `frame-src ${turnstileDomain}`,
         `form-action 'self'`,
         `object-src 'none'`,

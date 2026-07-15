@@ -382,7 +382,7 @@ const validateCspField = (field) => {
   const domains = value.split(',').map(s => s.trim()).filter(Boolean)
   for (const domain of domains) {
     if (!/^https:\/\/.+/.test(domain)) {
-      cspErrors[field] = 'Each domain must start with https://'
+      cspErrors[field] = props.trans.cspInvalidDomain || 'Each domain must start with https://'
       return false
     }
   }

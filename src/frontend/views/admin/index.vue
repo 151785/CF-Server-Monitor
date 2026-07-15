@@ -119,6 +119,7 @@
         />
 
         <SettingsPanel
+          ref="settingsPanelRef"
           :trans="trans"
           :settings="settings"
           :password-visible="passwordVisible"
@@ -583,6 +584,8 @@ const testNotificationLoading = ref(false)
 
 const saveResult = ref(null)
 
+const settingsPanelRef = ref(null)
+
 const showCopyModal = ref(false)
 const copyServerId = ref('')
 const currentServerName = ref('')
@@ -835,17 +838,11 @@ const saveSettings = async () => {
     }
   }
 
-  // CSP 字段格式校验
-  for (const field of ['csp_static', 'csp_api']) {
-    const value = settings.value[field] || ''
-    if (value) {
-      const domains = value.split(',').map(s => s.trim()).filter(Boolean)
-      for (const domain of domains) {
-        if (!/^https:\/\/.+/.test(domain)) {
-          validationError.value = trans.value.cspInvalidDomain
-          return
-        }
-      }
+  if (settingsPanelRef.value) {
+    const cspStaticValid = settingsPanelRef.value.validateCspField('csp_static')
+    const cspApiValid = settingsPanelRef.value.validateCspField('csp_api')
+    if (!cspStaticValid || !cspApiValid) {
+      return
     }
   }
 

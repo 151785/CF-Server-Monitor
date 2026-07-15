@@ -68,7 +68,6 @@ execSync('npx vite build', { cwd: rootDir, stdio: 'inherit', env: { ...process.e
 
 // 构建时注入配置到 HTML
 const turnstileDomain = 'https://challenges.cloudflare.com';
-const allCspDomains = [turnstileDomain, ...cspStaticDomains, ...cspApiDomains].join(' ');
 
 function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -103,15 +102,45 @@ for (const file of htmlFiles) {
       const domainRegex = /https?:\/\/[^\s';]+|wss?:\/\/[^\s';]+/g
       existingDomains = existingCsp.match(domainRegex) || []
     }
-    // 合并：默认白名单 + 环境变量配置
-    const mergedDomains = [...new Set([...existingDomains, ...allCspDomains.split(' ')])].join(' ')
+    // 按指令分类域名
+    const insightsDomain = 'https://static.cloudflareinsights.com';
+    const fontsApiDomain = 'https://fonts.googleapis.com';
+    const fontsStaticDomain = 'https://fonts.gstatic.com';
+
+    const scriptSrcDomains = [...new Set([
+      ...existingDomains.filter(d => [turnstileDomain, insightsDomain].includes(d)),
+      ...cspStaticDomains,
+      ...cspApiDomains.filter(d => d.startsWith('https://') || d.startsWith('wss://'))
+    ])].join(' ');
+
+    const styleSrcDomains = [...new Set([
+      ...existingDomains.filter(d => [turnstileDomain, fontsApiDomain].includes(d)),
+      ...cspStaticDomains
+    ])].join(' ');
+
+    const imgSrcDomains = [...new Set([
+      ...existingDomains.filter(d => [turnstileDomain].includes(d)),
+      ...cspStaticDomains
+    ])].join(' ');
+
+    const fontSrcDomains = [...new Set([
+      ...existingDomains.filter(d => [turnstileDomain, fontsStaticDomain].includes(d)),
+      ...cspStaticDomains
+    ])].join(' ');
+
+    const connectSrcDomains = [...new Set([
+      ...existingDomains.filter(d => [turnstileDomain, insightsDomain].includes(d)),
+      ...cspStaticDomains,
+      ...cspApiDomains
+    ])].join(' ');
+
     const csp = [
       `default-src 'self'`,
-      `script-src 'self' ${mergedDomains}`,
-      `style-src 'self' 'unsafe-inline' ${mergedDomains}`,
-      `img-src 'self' ${mergedDomains} data:`,
-      `font-src 'self' ${mergedDomains}`,
-      `connect-src 'self' ${mergedDomains}`,
+      `script-src 'self' 'unsafe-inline' ${scriptSrcDomains}`,
+      `style-src 'self' 'unsafe-inline' ${styleSrcDomains}`,
+      `img-src 'self' ${imgSrcDomains} data:`,
+      `font-src 'self' ${fontSrcDomains}`,
+      `connect-src 'self' ${connectSrcDomains}`,
       `frame-src ${turnstileDomain}`,
       `form-action 'self'`,
       `object-src 'none'`,
